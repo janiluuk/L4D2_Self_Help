@@ -18,7 +18,7 @@ ConVar shEnable, shUse, shIncapPickup, shDelay, shKillAttacker, shBot, shBotChan
 
 bool bIsL4D, bEnabled, bIncapPickup, bKillAttacker, bBot;
 float fAdrenalineDuration, fDelay, fTempHP, fLastPos[MAXPLAYERS+1][3], fSelfHelpTime[MAXPLAYERS+1];
-int iSurvivorClass, iUse, iBotChance, iHardHP, iMaxCount, iAttacker[MAXPLAYERS+1],
+int iSurvivorClass, iKillAttacker, iUse, iBotChance, iHardHP, iMaxCount, iAttacker[MAXPLAYERS+1],
 	iBotHelp[MAXPLAYERS+1], iReviveDuration, iMaxIncapCount, iSHCount[MAXPLAYERS+1];
 
 Handle hSHTime[MAXPLAYERS+1] = null, hSHGameData = null, hSHSetTempHP = null, hSHAdrenalineRush = null,
@@ -135,7 +135,7 @@ public void OnPluginStart()
 	shUse = CreateConVar("self_help_use", "3", "Use: 0=None, 1=Pills And Adrenalines, 2=First Aid Kits Only, 3=Both", FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0, true, 3.0);
 	shIncapPickup = CreateConVar("self_help_incap_pickup", "1", "Enable/Disable Item Pick-Ups While Incapacitated", FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0, true, 1.0);
 	shDelay = CreateConVar("self_help_delay", "1.0", "Delay Before Plugin Mechanism Kicks In", FCVAR_NOTIFY|FCVAR_SPONLY);
-	shKillAttacker = CreateConVar("self_help_kill_attacker", "0", "Enable/Disable Attacker Kills", FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0, true, 1.0);
+	shKillAttacker = CreateConVar("self_help_kill_attacker", "2", "0=Unpin using gear 1=Unpin and kill attacker 2=Unpin disabled", FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0, true, 2.0);
 	shBot = CreateConVar("self_help_bot", "1", "Enable/Disable Bot Self-Help", FCVAR_NOTIFY|FCVAR_SPONLY, true, 0.0, true, 1.0);
 	shBotChance = CreateConVar("self_help_bot_chance", "4", "Chance Of Bot Self-Helping: 1=Sometimes, 2=Often, 3=Seldom 4=Always", FCVAR_NOTIFY|FCVAR_SPONLY, true, 1.0, true, 4.0);
 	shHardHP = CreateConVar("self_help_hard_hp", "50", "Health Given After Self-Helping", FCVAR_NOTIFY|FCVAR_SPONLY, true, 1.0);
@@ -155,6 +155,8 @@ public void OnPluginStart()
 	bEnabled = shEnable.BoolValue;
 	bIncapPickup = shIncapPickup.BoolValue;
 	bKillAttacker = shKillAttacker.BoolValue;
+	iKillAttacker = shKillAttacker.IntValue;
+
 	bBot = shBot.BoolValue;
 	
 	fDelay = shDelay.FloatValue;
@@ -165,6 +167,7 @@ public void OnPluginStart()
 	shIncapPickup.AddChangeHook(OnSHCVarsChanged);
 	shDelay.AddChangeHook(OnSHCVarsChanged);
 	shKillAttacker.AddChangeHook(OnSHCVarsChanged);
+
 	shBot.AddChangeHook(OnSHCVarsChanged);
 	shBotChance.AddChangeHook(OnSHCVarsChanged);
 	shHardHP.AddChangeHook(OnSHCVarsChanged);
@@ -228,6 +231,8 @@ public void OnSHCVarsChanged(ConVar cvar, const char[] sOldValue, const char[] s
 	bEnabled = shEnable.BoolValue;
 	bIncapPickup = shIncapPickup.BoolValue;
 	bKillAttacker = shKillAttacker.BoolValue;
+	iKillAttacker = shKillAttacker.IntValue;
+
 	bBot = shBot.BoolValue;
 	
 	fDelay = shDelay.FloatValue;
@@ -353,7 +358,8 @@ public void OnPlayerDown(Event event, const char[] name, bool dontBroadcast)
 		}
 		
 		CreateTimer(fDelay, FireUpMechanism, GetClientUserId(wounded));
-		
+		PrintToChat(wounded, "You Got Incapacitated! |%N|", name);
+
 		if (StrEqual(name, "player_incapacitated"))
 		{
 			PrintHintText(wounded, "Hold R To Revive Other Incapacitated Survivors!");
@@ -387,7 +393,7 @@ public void OnPlayerDown(Event event, const char[] name, bool dontBroadcast)
 					iReviveCount = iMaxIncapCount - 1;
 				}
 				
-				//PrintToChat(wounded, "You Got Incapacitated! |%d/%i|", iReviveCount + 1, iMaxIncapCount);
+				PrintToChat(wounded, "You Got Incapacitated! |%d/%i|", iReviveCount + 1, iMaxIncapCount);
 				if (iReviveCount == iMaxIncapCount)
 				{
 					for (int i = 1; i <= MaxClients; i++)
@@ -418,7 +424,7 @@ public Action FireUpMechanism(Handle timer, any userid)
 	{
 		if (!GetEntProp(client, Prop_Send, "m_isIncapacitated", 1) && !GetEntProp(client, Prop_Send, "m_isHangingFromLedge", 1))
 		{
-			if (iAttacker[client] == 0 || (iAttacker[client] != 0 && (!IsClientInGame(iAttacker[client]) || !IsPlayerAlive(iAttacker[client]))))
+			if (iAttacker[client] == 0 || (iAttacker[client] != 0 && (!IsClientInGame(iAttacker[client]) || !IsPlayerAlive(iAttacker[client]) || iKillAttacker == 2)))
 			{
 				return Plugin_Stop;
 			}
@@ -429,7 +435,7 @@ public Action FireUpMechanism(Handle timer, any userid)
 			return Plugin_Stop;
 		}
 		
-		if (bBot && IsFakeClient(client) && iBotHelp[client] == 0 && (GetRandomInt(1, 3) == iBotChance) || iBotChance > 3)
+		if (bBot && IsFakeClient(client) && iBotHelp[client] == 0 && (GetRandomInt(1, 3) == iBotChance || iBotChance > 3))
 		{
 			iBotHelp[client] = 1;
 		}
@@ -466,7 +472,7 @@ public Action AnalyzePlayerState(Handle timer, any userid)
 	
 	if (!GetEntProp(client, Prop_Send, "m_isIncapacitated", 1) && !GetEntProp(client, Prop_Send, "m_isHangingFromLedge", 1))
 	{
-		if (iAttacker[client] == 0 || (iAttacker[client] != 0 && (!IsClientInGame(iAttacker[client]) || !IsPlayerAlive(iAttacker[client]))))
+		if (iAttacker[client] == 0 || (iAttacker[client] != 0 && (!IsClientInGame(iAttacker[client]) || !IsPlayerAlive(iAttacker[client]) || iKillAttacker == 2)))
 		{
 			iAttacker[client] = 0;
 			
@@ -504,7 +510,7 @@ public Action AnalyzePlayerState(Handle timer, any userid)
 					
 					if (!bIsL4D)
 					{
-//						PrintHintText(client, "[SH]\nHelping Yourself!");
+						PrintHintText(client, "Helping Yourself!");
 					}
 				}
 				
@@ -644,7 +650,7 @@ public Action AnalyzePlayerState(Handle timer, any userid)
 				if (GetVectorDistance(fPos, fItemPos) <= 150.0)
 				{
 					ExecuteCommand(client, "give", "pain_pills");
-				//	PrintHintText(client, "[SH]\nGrabbing Pain Pills!");
+					PrintHintText(client, "Grabbing Pain Pills!");
 					
 					AcceptEntityInput(iItemEnt, "Kill");
 					RemoveEdict(iItemEnt);
@@ -722,7 +728,12 @@ public Action SHReviveCompletion(Handle timer, Handle dpSHRevive)
 			DataPack dpSHReviveDelay = new DataPack();
 			dpSHReviveDelay.WriteCell(GetClientUserId(client));
 			dpSHReviveDelay.WriteCell(bAidCheck);
-			CreateTimer(0.1, SelfReviveDelay, dpSHReviveDelay, TIMER_DATA_HNDL_CLOSE);
+			int dominator = iAttacker[client];
+			if (iKillAttacker == 2 && dominator != 0 && IsClientInGame(dominator) && GetClientTeam(dominator) == 3 && IsPlayerAlive(dominator)) {
+				//
+			} else {
+				CreateTimer(0.1, SelfReviveDelay, dpSHReviveDelay, TIMER_DATA_HNDL_CLOSE);
+			}
 		}
 		else
 		{
@@ -747,6 +758,7 @@ public Action SHReviveCompletion(Handle timer, Handle dpSHRevive)
 				UnloopAnnoyingMusic(client, sGameSounds[i]);
 			}
 		}
+		
 		
 		RemoveHindrance(client);
 		
@@ -774,7 +786,7 @@ public Action SelfReviveDelay(Handle timer, Handle dpSHReviveDelay)
 	}
 	else
 	{
-		iSHCount[client] -= 1;
+		//iSHCount[client] -= 1;
 		
 		Event eReviveSuccess = CreateEvent("revive_success");
 		eReviveSuccess.SetInt("userid", GetClientUserId(client));
@@ -980,7 +992,7 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 			{
 				if (!IsFakeClient(revived))
 				{
-					CPrintToChat(revived, "{blue}[SH] {default}You Helped Yourself!");
+					CPrintToChat(revived, "{default}You Helped Yourself!");
 				}
 			}
 		}
@@ -998,7 +1010,7 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 				{
 					if (!IsFakeClient(revived))
 					{
-						CPrintToChat(revived, "{default}You Helped Yourself! |%d/%i|", iReviveCount, iMaxIncapCount);
+						CPrintToChat(revived, "{default}You Helped Yourself!");
 					}
 				}
 				else
@@ -1007,15 +1019,15 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 					{
 						if (GetEntProp(reviver, Prop_Send, "m_isIncapacitated", 1))
 						{
-							CPrintToChatAll("{blue}[SH] {olive}%N{default} Saved{olive} %N {default}While Incapacitated!", reviver, revived);
+							CPrintToChatAll("{olive}%N{default} Saved{olive} %N {default}While Incapacitated!", reviver, revived);
 						}
 						
-						CPrintToChat(reviver, "{blue}[SH] {default}You Helped{olive} %N{default}! |{green}%d{default}/{green}%i{default}|", revived, iReviveCount, iMaxIncapCount);
+						CPrintToChat(reviver, "{default}You Helped{olive} %N{default}!", revived);
 					}
 					
 					if (!IsFakeClient(revived))
 					{
-						CPrintToChat(revived, "{blue}[SH] {olive}%N{default} Helped You! |{green}%d{default}/{green}%i{default}|", reviver, iReviveCount, iMaxIncapCount);
+						CPrintToChat(revived, "{olive}%N{default} Helped You! ", reviver);
 					}
 				}
 			}
@@ -1030,7 +1042,7 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 				}
 				else
 				{
-					iSHCount[revived] += 1;
+				//	iSHCount[revived] += 1;
 					if (iSHCount[revived] != 0)
 					{
 						SetEntProp(revived, Prop_Send, "m_currentReviveCount", 1);
@@ -1042,7 +1054,7 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 				{
 					if (!IsFakeClient(revived))
 					{
-						CPrintToChat(revived, "{default}You Helped Yourself! |{green}%d{default}/{green}%i{default}|", iSHCount[revived], iMaxCount);
+						CPrintToChat(revived, "{default}You Helped Yourself! ");
 					}
 				}
 				else
@@ -1054,12 +1066,12 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 						//	CPrintToChatAll("{blue}[SH] {olive}%N{default} Saved{olive} %N {default}While Incapacitated!", reviver, revived);
 						}
 						
-						PrintToChat(reviver, "You Helped %N! |%d/%i|", revived, iSHCount[revived], iMaxCount);
+						CPrintToChat(reviver, "You Helped %N!", revived);
 					}
 					
 					if (!IsFakeClient(revived))
 					{
-						PrintToChat(revived, "%N Helped You! |%d/%i|", reviver, iSHCount[revived], iMaxCount);
+						CPrintToChat(revived, "%N Helped You!", reviver);
 					}
 				}
 			}
@@ -1114,7 +1126,9 @@ public void OnInfectedGrab(Event event, const char[] name, bool dontBroadcast)
 	if (grabber && IsSurvivor(grabbed))
 	{
 		iAttacker[grabbed] = grabber;
-		CreateTimer(fDelay, FireUpMechanism, GetClientUserId(grabbed));
+		if (iKillAttacker != 2) {
+			CreateTimer(fDelay, FireUpMechanism, GetClientUserId(grabbed));
+		}
 	}
 }
 
@@ -1428,11 +1442,14 @@ void SHStatsFixer(int client, bool bDoNotTamper, bool bUseItem = true, bool &bMe
 					{
 						bFirstAidUsed = true;
 						bEmergencyUsed = false;
-					}
+						bSmartHeal = true;
+				}
 					else if (CheckPlayerSupply(client, 4, iUsedItem, sUsedItemName))
 					{
 						bEmergencyUsed = true;
 						bFirstAidUsed = false;
+						bSmartHeal = false;
+
 					}
 				}
 			}
@@ -1492,12 +1509,13 @@ void SHStatsFixer(int client, bool bDoNotTamper, bool bUseItem = true, bool &bMe
 		
 		if ((bEmergencyUsed || bFirstAidUsed) && RemovePlayerItem(client, iUsedItem))
 		{
+
 			AcceptEntityInput(iUsedItem, "Kill");
 			RemoveEdict(iUsedItem);
 			
 			if (bFirstAidUsed)
 			{
-				//CPrintToChatAll("{blue}[SH] {olive}%N {default}Helped Themselves With{green} Medkit{default}!", client);
+				CPrintToChatAll("{olive}%N {default}Helped Themselves With{green} Medkit{default}!", client);
 				
 				if (bSmartHeal)
 				{	
@@ -1535,7 +1553,7 @@ void SHStatsFixer(int client, bool bDoNotTamper, bool bUseItem = true, bool &bMe
 					eAdrenalineUsed.Fire();
 					
 					SDKCall(hSHAdrenalineRush, client, fAdrenalineDuration);
-					CPrintToChatAll("{blue}{olive}%N {default}Helped Themselves With{green} Adrenaline{default}!", client);
+					CPrintToChatAll("{olive}%N {default}Helped Themselves With{green} Adrenaline{default}!", client);
 				}
 				else
 				{
@@ -1544,7 +1562,7 @@ void SHStatsFixer(int client, bool bDoNotTamper, bool bUseItem = true, bool &bMe
 					ePillsUsed.SetInt("subject", GetClientUserId(client));
 					ePillsUsed.Fire();
 					
-					CPrintToChatAll("{blue}{olive}%N {default}Helped Themselves With{green} Pills{default}!", client);
+					CPrintToChatAll("{olive}%N {default}Helped Themselves With{green} Pills{default}!", client);
 				}
 			}
 		}
@@ -1563,7 +1581,7 @@ void SHStatsFixer(int client, bool bDoNotTamper, bool bUseItem = true, bool &bMe
 		}
 		else
 		{
-			SetEntProp(client, Prop_Send, "m_currentReviveCount", iReviveCount + 1);
+			SetEntProp(client, Prop_Send, "m_currentReviveCount", iReviveCount);
 			SetEntProp(client, Prop_Send, "m_bIsOnThirdStrike", 0, 1);
 			SetEntProp(client, Prop_Send, "m_isGoingToDie", 0, 1);
 		}
@@ -1572,6 +1590,7 @@ void SHStatsFixer(int client, bool bDoNotTamper, bool bUseItem = true, bool &bMe
 
 void DoSelfHelp(int client, bool bWasMedkitUsed = false)
 {
+
 	if (GetEntProp(client, Prop_Send, "m_isIncapacitated", 1))
 	{
 		SetEntProp(client, Prop_Send, "m_isIncapacitated", 0, 1);
@@ -1630,7 +1649,7 @@ void RemoveHindrance(int client)
 	int dominator = iAttacker[client];
 	iAttacker[client] = 0;
 	
-	if (dominator != 0 && IsClientInGame(dominator) && GetClientTeam(dominator) == 3 && IsPlayerAlive(dominator))
+	if (dominator != 0 && IsClientInGame(dominator) && GetClientTeam(dominator) == 3 && IsPlayerAlive(dominator) && iKillAttacker != 2)
 	{
 		switch (GetEntProp(dominator, Prop_Send, "m_zombieClass"))
 		{
@@ -1672,20 +1691,21 @@ void RemoveHindrance(int client)
 			}
 		}
 		
-		if (!bKillAttacker)
+		if (iKillAttacker == 0)
 		{
 			float fStaggerPos[3];
 			GetEntPropVector(client, Prop_Send, "m_vecOrigin", fStaggerPos);
 			SDKCall(hSHStagger, dominator, client, fStaggerPos);
-		}
+
+		} 
 		else
 		{
 			ForcePlayerSuicide(dominator);
-			
 			Event ePlayerDeath = CreateEvent("player_death");
 			ePlayerDeath.SetInt("userid", GetClientUserId(dominator));
 			ePlayerDeath.SetInt("attacker", GetClientUserId(client));
 			ePlayerDeath.Fire();
+
 		}
 		
 		if (bIsL4D)

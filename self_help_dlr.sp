@@ -392,7 +392,7 @@ public void OnPlayerDown(Event event, const char[] name, bool dontBroadcast)
 					iReviveCount = iMaxIncapCount - 1;
 				}
 				
-				PrintToChat(wounded, "You Got Incapacitated! |%d/%i|", iReviveCount + 1, iMaxIncapCount);
+				//PrintToChat(wounded, "You Got Incapacitated!");
 				if (iReviveCount == iMaxIncapCount)
 				{
 					for (int i = 1; i <= MaxClients; i++)
@@ -991,7 +991,7 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 			{
 				if (!IsFakeClient(revived))
 				{
-					CPrintToChat(revived, "{default}You Helped Yourself!");
+				//	CPrintToChat(revived, "{default}You Helped Yourself!");
 				}
 			}
 		}
@@ -1009,7 +1009,7 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 				{
 					if (!IsFakeClient(revived))
 					{
-						CPrintToChat(revived, "{default}You Helped Yourself!");
+						//CPrintToChat(revived, "{default}You Helped Yourself!");
 					}
 				}
 				else
@@ -1053,7 +1053,7 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 				{
 					if (!IsFakeClient(revived))
 					{
-						CPrintToChat(revived, "{default}You Helped Yourself! ");
+						//CPrintToChat(revived, "{default}You Helped Yourself! ");
 					}
 				}
 				else

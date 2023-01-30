@@ -509,7 +509,7 @@ public Action AnalyzePlayerState(Handle timer, any userid)
 					
 					if (!bIsL4D)
 					{
-						PrintHintText(client, "Helping Yourself!");
+						//PrintHintText(client, "Helping Yourself!");
 					}
 				}
 				
@@ -525,6 +525,9 @@ public Action AnalyzePlayerState(Handle timer, any userid)
 				shsBit[client] = SHS_NONE;
 			}
 		}
+	
+	} else {
+		shsBit[client] = SHS_NONE;
 	}
 	
 	if (iButtons & IN_RELOAD)
@@ -984,7 +987,7 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 				
 				if (!IsFakeClient(revived))
 				{
-					CPrintToChat(revived, "{olive}%N{default} Helped You!", reviver);
+					//CPrintToChat(revived, "{olive}%N{default} Helped You!", reviver);
 				}
 			}
 			else
@@ -1044,7 +1047,7 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 				 	iSHCount[revived] += 1;
 					if (iSHCount[revived] != 0)
 					{
-						SetEntProp(revived, Prop_Send, "m_currentReviveCount", 1);
+						SetEntProp(revived, Prop_Send, "m_currentReviveCount", 0);
 						SetEntProp(revived, Prop_Send, "m_isGoingToDie", 0, 1);
 					}
 				}

@@ -358,7 +358,6 @@ public void OnPlayerDown(Event event, const char[] name, bool dontBroadcast)
 		}
 		
 		CreateTimer(fDelay, FireUpMechanism, GetClientUserId(wounded));
-		PrintToChat(wounded, "You Got Incapacitated! |%N|", name);
 
 		if (StrEqual(name, "player_incapacitated"))
 		{
@@ -424,7 +423,7 @@ public Action FireUpMechanism(Handle timer, any userid)
 	{
 		if (!GetEntProp(client, Prop_Send, "m_isIncapacitated", 1) && !GetEntProp(client, Prop_Send, "m_isHangingFromLedge", 1))
 		{
-			if (iAttacker[client] == 0 || (iAttacker[client] != 0 && (!IsClientInGame(iAttacker[client]) || !IsPlayerAlive(iAttacker[client]) || iKillAttacker == 2)))
+			if (iAttacker[client] == 0 || (iAttacker[client] != 0 && (!IsClientInGame(iAttacker[client]) || !IsPlayerAlive(iAttacker[client]))))
 			{
 				return Plugin_Stop;
 			}
@@ -1042,7 +1041,7 @@ public void OnReviveSuccess(Event event, const char[] name, bool dontBroadcast)
 				}
 				else
 				{
-				//	iSHCount[revived] += 1;
+				 	iSHCount[revived] += 1;
 					if (iSHCount[revived] != 0)
 					{
 						SetEntProp(revived, Prop_Send, "m_currentReviveCount", 1);
@@ -1535,7 +1534,7 @@ void SHStatsFixer(int client, bool bDoNotTamper, bool bUseItem = true, bool &bMe
 					}
 					else
 					{
-						SetEntProp(client, Prop_Send, "m_currentReviveCount", -1);
+						SetEntProp(client, Prop_Send, "m_currentReviveCount", 0);
 					}
 				}
 			}

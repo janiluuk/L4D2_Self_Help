@@ -953,7 +953,7 @@ stock KillProgressBar(client)
 // Get medpack item entity
 stock int GetMedkitEntity(const int client){
     int Tmp = GetPlayerWeaponSlot(client, 3);
-    return ((IsValidEntity(Tmp)) ? Tmp : -1);
+    return ((HaveKid(client) && IsValidEntity(Tmp)) ? Tmp : -1);
 }
 
 // Get health item entity

@@ -50,7 +50,7 @@ public Plugin:myinfo =
 {
 	name = "Self Help with bot support ",
 	author = "Pan Xiaohai, Yani",
-	description = " ",
+	description = "",
 	version = PLUGIN_VERSION,	
 }
 
@@ -67,8 +67,7 @@ public OnPluginStart()
 	l4d_selfhelp_eachother = CreateConVar("l4d_selfhelp_eachother", "1", "incap help each other , 0: disable, 1 :enable  ");
 	l4d_selfhelp_pickup = CreateConVar("l4d_selfhelp_pickup", "1", "incap pick up , 0: disable, 1 :enable  ");
 	l4d_selfhelp_kill = CreateConVar("l4d_selfhelp_kill", "1", "kill attacker");
-
-	l4d_selfhelp_hintdelay = CreateConVar("l4d_selfhelp_hintdelay", "3.0", "hint delay");
+	l4d_selfhelp_hintdelay = CreateConVar("l4d_selfhelp_hintdelay", "4.0", "hint delay");
 	l4d_selfhelp_delay = CreateConVar("l4d_selfhelp_delay", "1.0", "self help delay");
 	l4d_selfhelp_bot_delay = CreateConVar("l4d_selfhelp_bot_delay", "10.0", "delay this amount of seconds before bots self-recover");
 	l4d_selfhelp_duration = CreateConVar("l4d_selfhelp_duration", "3.0", "Override selfhelp duration with this amount of seconds");
@@ -841,27 +840,6 @@ KillAttack(client)
 	}
 }
 
-new String:Gauge1[2] = "-";
-new String:Gauge3[2] = "#";
-ShowBar(client, String:msg[], Float:pos, Float:max)	 
-{
-	new i ;
-	new String:ChargeBar[100];
-	Format(ChargeBar, sizeof(ChargeBar), "");
-
-	new Float:GaugeNum = pos/max*100;
-	if(GaugeNum > 100.0)
-	GaugeNum = 100.0;
-	if(GaugeNum<0.0)
-	GaugeNum = 0.0;
-	for(i=0; i<100; i++)
-	ChargeBar[i] = Gauge1[0];
-	new p=RoundFloat( GaugeNum);
-
-	if(p>=0 && p<100)ChargeBar[p] = Gauge3[0]; 
-	/* Display gauge */
-	PrintHintText(client, "%s  %3.0f %\n<< %s >>", msg, GaugeNum, ChargeBar);
-}
 bool:HaveKit(client)
 {
 	decl String:weapon[32];
@@ -937,12 +915,12 @@ reset()
 stock SetupProgressBar(client, Float:time)
 {
 	//KillProgressBar(client);
-	SetEntPropEnt(client, Prop_Send, "m_reviveOwner", -1);
+	SetEntPropEnt(client, Prop_Send, "m_reviveOwner", 0);
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", time);
 
 	//SetEntPropEnt(client, Prop_Send, "m_reviveOwner", client);
-	//SetEntPropEnt(client, Prop_Send, "m_reviveTarget", client);
+	SetEntPropEnt(client, Prop_Send, "m_reviveTarget", client);
 
 }
 
@@ -951,12 +929,11 @@ stock KillProgressBar(client)
 	//SetEntPropEnt(client, Prop_Send, "m_reviveOwner", -1);
 	//SetEntityMoveType(client, MOVETYPE_WALK);
 	//SetEntPropEnt(client, Prop_Send, "m_reviveTarget", 0);
+	SetEntPropEnt(client, Prop_Send, "m_reviveOwner", 0);
 
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", 0.0);
-	//SetEntPropEnt(client, Prop_Send, "m_reviveOwner", 0);
 }
-
 
 // Get medpack item entity
 stock int GetMedkitEntity(const int client){

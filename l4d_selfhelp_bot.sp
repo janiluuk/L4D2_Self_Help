@@ -916,12 +916,15 @@ stock SetupProgressBar(client, Float:time)
 {
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", time);
-	SetEntPropString(client, Prop_Send, "m_progressBarText", "HELPING YOURSELF...");
+	if (!IsFakeClient(client))
+		SetEntPropString(client, Prop_Send, "m_progressBarText", "HELPING YOURSELF...");
 }
 
 stock KillProgressBar(client)
 {
-  	SetEntPropString(client, Prop_Send, "m_progressBarText", "");
+	if (!IsFakeClient(client))
+	  	SetEntPropString(client, Prop_Send, "m_progressBarText", "");
+	
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", 0.0);
 }

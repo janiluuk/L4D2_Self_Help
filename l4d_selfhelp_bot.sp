@@ -777,7 +777,7 @@ HelpOther(client, helper)
 
 	new Handle:revivehealth = FindConVar("pain_pills_health_value");  
 
-	new temphpoffset = FindSendPropOffs("CTerrorPlayer","m_healthBuffer");
+	new temphpoffset = FindSendPropInfo("CTerrorPlayer","m_healthBuffer");
 	SetEntDataFloat(client, temphpoffset, GetConVarFloat(revivehealth), true);
 	SetEntityHealth(client, 1);
 	PrintToChatAll("\x04%N\x03 helped\x04 %N \x03 when incapacitated", helper, client);  
@@ -795,7 +795,7 @@ ReviveClientWithKid(client)
 	SetUserFlagBits(client, userflags);
 	SetEntData(client, propincapcounter, 0, 1);
 	new Handle:revivehealth = FindConVar("first_aid_heal_percent"); 
-	new temphpoffset = FindSendPropOffs("CTerrorPlayer","m_healthBuffer");
+	new temphpoffset = FindSendPropInfo("CTerrorPlayer","m_healthBuffer");
 	SetEntDataFloat(client, temphpoffset, GetConVarFloat(revivehealth)*100.0, true);
 	SetEntityHealth(client, 1);
 }
@@ -811,7 +811,7 @@ ReviveClientWithPills(client)
 	SetEntData(client, propincapcounter,count, 1);
 	
 	new Handle:revivehealth = FindConVar("pain_pills_health_value");  
-	new temphpoffset = FindSendPropOffs("CTerrorPlayer","m_healthBuffer");
+	new temphpoffset = FindSendPropInfo("CTerrorPlayer","m_healthBuffer");
 	SetEntDataFloat(client, temphpoffset, GetConVarFloat(revivehealth), true);
 	SetEntityHealth(client, 1);
 }
@@ -914,25 +914,38 @@ reset()
 }
 stock SetupProgressBar(client, Float:time)
 {
-	//KillProgressBar(client);
-	SetEntPropEnt(client, Prop_Send, "m_reviveOwner", 0);
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", time);
-
-	//SetEntPropEnt(client, Prop_Send, "m_reviveOwner", client);
-	SetEntPropEnt(client, Prop_Send, "m_reviveTarget", client);
-
+	SetEntPropString(client, Prop_Send, "m_progressBarText", "HELPING YOURSELF...");
 }
 
 stock KillProgressBar(client)
 {
-	//SetEntPropEnt(client, Prop_Send, "m_reviveOwner", -1);
-	//SetEntityMoveType(client, MOVETYPE_WALK);
-	//SetEntPropEnt(client, Prop_Send, "m_reviveTarget", 0);
-	SetEntPropEnt(client, Prop_Send, "m_reviveOwner", 0);
-
+  	SetEntPropString(client, Prop_Send, "m_progressBarText", "");
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", 0.0);
+}
+new String:Gauge1[2] = "-";
+new String:Gauge3[2] = "#";
+
+public ShowBar(client, String:msg[], Float:pos, Float:max)
+{
+        new i;
+        new String:ChargeBar[100];
+        Format(ChargeBar, sizeof(ChargeBar), "");
+
+        new Float:GaugeNum = pos/max*100;
+        if(GaugeNum > 100.0)
+        GaugeNum = 100.0;
+        if(GaugeNum<0.0)
+        GaugeNum = 0.0;
+        for(i=0; i<100; i++)
+        ChargeBar[i] = Gauge1[0];
+        new p=RoundFloat( GaugeNum);
+
+        if(p>=0 && p<100)ChargeBar[p] = Gauge3[0];
+        /* Display gauge */
+        PrintHintText(client, "%s  %3.0f %\n<< %s >>", msg, GaugeNum, ChargeBar);
 }
 
 // Get medpack item entity
@@ -967,7 +980,7 @@ public void resetBot(Event event, char []hEvent, bool dontBroadcast){
 			PrintToChatAll("%N Will revive in %i seconds",client, botdelay );
 			CreateTimer(fBotdelay, AutoHelpBot,client,TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);	
 			} else {
-				PrintToChat(client,"Hold CROUCH to help yourself up!");
+				//PrintToChat(client,"Hold CROUCH to help yourself up!");
 			}
 		}		
 	}

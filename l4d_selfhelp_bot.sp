@@ -2,11 +2,12 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 
 #define SOUND_KILL1  "/weapons/knife/knife_hitwall1.wav"
 #define SOUND_KILL2  "/weapons/knife/knife_deploy.wav"
-
+#define GAMEDATA "l4d_selfhelp_bot"
+#define PLUGIN_NAME "Self Help with bot support"
 #define INCAP	         1
 #define INCAP_GRAB	     2
 #define INCAP_POUNCE     3
@@ -41,14 +42,19 @@ new Handle:l4d_selfhelp_eachother = INVALID_HANDLE;
 new Handle:l4d_selfhelp_pickup = INVALID_HANDLE;
 new Handle:l4d_selfhelp_bot_delay = INVALID_HANDLE;
 new Handle:l4d_selfhelp_duration = INVALID_HANDLE;
-
 new Handle:l4d_selfhelp_kill = INVALID_HANDLE;
-
 new Handle:l4d_selfhelp_versus = INVALID_HANDLE;
+new Handle:hOnAdrenalineRush = null;
+new Handle:hOnStagger = null ;
+new Handle:hOnGameData = null;
+new ConVar:cvarAdrenalineDuration;
+float fAdrenalineDuration;
+new Handle:hConf = null;
+
 new L4D2Version=false;
 public Plugin:myinfo = 
 {
-	name = "Self Help with bot support ",
+	name = PLUGIN_NAME,
 	author = "Pan Xiaohai, Yani",
 	description = "",
 	version = PLUGIN_VERSION,	
@@ -99,7 +105,99 @@ public OnPluginStart()
 		HookEvent("charger_pummel_end", charger_pummel_end);
 
 	}
-	reviveDuration = GetConVarFloat(l4d_selfhelp_duration);
+	cvarAdrenalineDuration = FindConVar("adrenaline_duration");
+	fAdrenalineDuration = cvarAdrenalineDuration.FloatValue;
+	
+	char filePath[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, filePath, sizeof(filePath), "gamedata/%s.txt", GAMEDATA);
+	if( FileExists(filePath))
+	{
+		hConf = LoadGameConfigFile(GAMEDATA); // For some reason this doesn't return null even for invalid files, so check they exist first.
+	} else {
+		PrintToServer("[SM] %s unable to get %s.txt gamedata file. Generating...", PLUGIN_NAME, GAMEDATA);
+		
+		Handle fileHandle = OpenFile(filePath, "w"); 
+		if (fileHandle == null)
+		{ 
+			SetFailState("[SM] Couldn't generate gamedata file!"); 
+		}
+		WriteFileLine(fileHandle, "\"Games\"");
+		WriteFileLine(fileHandle, "{");
+		WriteFileLine(fileHandle, "	\"left4dead2\"");
+		WriteFileLine(fileHandle, "	{");
+		WriteFileLine(fileHandle, "		\"Signatures\"");
+		WriteFileLine(fileHandle, "		{");
+		WriteFileLine(fileHandle, "			// Below 3 signatures were taken from https://forums.alliedmods.net/showthread.php?t=109715");
+		WriteFileLine(fileHandle, "			// Except OnPummelEnded's windows signature. I had to get a fresh new one.");
+		WriteFileLine(fileHandle, "		\"OnAdrenalineUsed\"");
+		WriteFileLine(fileHandle, "		{");
+		WriteFileLine(fileHandle, "		\"library\"	\"server\"");
+		WriteFileLine(fileHandle, "		\"linux\"		\"@_ZN13CTerrorPlayer16OnAdrenalineUsedEf\"");
+		WriteFileLine(fileHandle, "		\"windows\"	\"\x55\x8B\x2A\x51\x53\x56\x8B\x2A\x8D\x2A\x2A\x2A\x2A\x2A\x57\x8B\x2A\xE8\"");
+		WriteFileLine(fileHandle, "		/* 55 8B ? 51 53 56 8B ? 8D ? ? ? ? ? 57 8B ? E8 */");
+		WriteFileLine(fileHandle, "		/* Search: \"%s used adrenaline\n\" call is 3rd above, match to Linux. */");
+		WriteFileLine(fileHandle, "		}");
+		WriteFileLine(fileHandle, "		\"SetHealthBuffer\"");
+		WriteFileLine(fileHandle, "		{");
+		WriteFileLine(fileHandle, "		\"library\" \"server\"");
+		WriteFileLine(fileHandle, "		\"linux\" \"@_ZN13CTerrorPlayer15SetHealthBufferEf\"");
+		WriteFileLine(fileHandle, "		\"windows\" \"\x55\x8B\xEC\xF3\x0F\x10\x45\x08\x0F\x57\xC9\x0F\x2F\xC1\x56\"");
+		WriteFileLine(fileHandle, "		/* 55 8B EC F3 0F 10 45 08 0F 57 C9 0F 2F C1 56 */");
+		WriteFileLine(fileHandle, "		}");
+		WriteFileLine(fileHandle, "		\"OnAdrenalineUsed\"");
+		WriteFileLine(fileHandle, "		{");
+		WriteFileLine(fileHandle, "		\"library\"	\"server\"");
+		WriteFileLine(fileHandle, "		\"linux\"		\"@_ZN13CTerrorPlayer16OnAdrenalineUsedEf\"");
+		WriteFileLine(fileHandle, "		\"windows\"	\"\x55\x8B\x2A\x51\x53\x56\x8B\x2A\x8D\x2A\x2A\x2A\x2A\x2A\x57\x8B\x2A\xE8\"");
+		WriteFileLine(fileHandle, "		/* 55 8B ? 51 53 56 8B ? 8D ? ? ? ? ? 57 8B ? E8 */");
+		WriteFileLine(fileHandle, "		/* Search: \"%s used adrenaline\n\" call is 3rd above, match to Linux. */");
+		WriteFileLine(fileHandle, "		}");
+		WriteFileLine(fileHandle, "		\"OnRevived\"");
+		WriteFileLine(fileHandle, "		{");
+		WriteFileLine(fileHandle, "		\"library\"	\"server\"");
+		WriteFileLine(fileHandle, "		\"linux\"		\"@_ZN13CTerrorPlayer9OnRevivedEv\"");
+		WriteFileLine(fileHandle, "		\"windows\"	\"\x2A\x2A\x2A\x2A\x2A\x2A\x53\x56\x8B\xF1\x8B\x06\x8B\x90\x2A\x2A\x2A\x2A\x57\xFF\xD2\x84\xC0\x0F\x84\x2A\x2A\x2A\x2A\x8B\xCE\"");
+		WriteFileLine(fileHandle, "		/* ? ? ? ? ? ? 53 56 8B F1 8B 06 8B 90 ? ? ? ? 57 FF D2 84 C0 0F 84 ? ? ? ? 8B CE */");
+		WriteFileLine(fileHandle, "		}");
+		WriteFileLine(fileHandle, "		\"OnStaggered\"");
+		WriteFileLine(fileHandle, "		{");
+		WriteFileLine(fileHandle, "		\"library\"	\"server\"");
+		WriteFileLine(fileHandle, "		\"linux\"		\"@_ZN13CTerrorPlayer11OnStaggeredEP11CBaseEntityPK6Vector\"");
+		WriteFileLine(fileHandle, "		\"windows\" 	\"\x2A\x2A\x2A\x2A\x2A\x2A\x83\x2A\x2A\x83\x2A\x2A\x55\x8B\x2A\x2A\x89\x2A\x2A\x2A\x8B\x2A\x83\x2A\x2A\x56\x57\x8B\x2A\xE8\x2A\x2A\x2A\x2A\x84\x2A\x0F\x85\x2A\x2A\x2A\x2A\x8B\x2A\x8B\"");
+		WriteFileLine(fileHandle, "		/* ? ? ? ? ? ? 83 ? ? 83 ? ? 55 8B ? ? 89 ? ? ? 8B ? 83 ? ? 56 57 8B ? E8 ? ? ? ? 84 ? 0F 85 ? ? ? ? 8B ? 8B");
+		WriteFileLine(fileHandle, "		 * Using a long local jump as the unique portion (last few bytes of sig)");
+		WriteFileLine(fileHandle, "		 */");
+		WriteFileLine(fileHandle, "		}");
+		WriteFileLine(fileHandle, "	}");
+		WriteFileLine(fileHandle, "}");
+		
+		CloseHandle(fileHandle);
+		hConf = LoadGameConfigFile(GAMEDATA);
+		if (hConf == null)
+		{ 
+			SetFailState("[SH] Failed to load auto-generated gamedata file!"); 
+		}
+	}	
+
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(hOnGameData, SDKConf_Signature, "OnStaggered");
+	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
+	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_Pointer);
+	hOnStagger = EndPrepSDKCall();
+	if (hOnStagger == null)
+	{
+		SetFailState("[SH] Signature 'OnStaggered' Broken!");
+	}
+
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(hOnGameData, SDKConf_Signature, "OnAdrenalineUsed");
+	PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);
+	hOnAdrenalineRush = EndPrepSDKCall();
+	if (hOnAdrenalineRush == null)
+	{
+		SetFailState("[SH] Signature 'OnAdrenalineUsed' Broken!");
+	}
+
 }
 new GameMode;
 GameCheck()
@@ -724,10 +822,21 @@ SelfHelp(client)
 
 			HelpState[client]=STATE_OK;
 			
-			if(adrenaline)	PrintToChatAll("\x04%N\x03 helped himself with adrenaline!", client);  
-			if(pills)	PrintToChatAll("\x04%N\x03 helped himself with pills!", client); 	
+			if(adrenaline) { 
+				PrintToChatAll("\x04%N\x03 helped himself with adrenaline!", client); 
+				if (!GetEntProp(client, Prop_Send, "m_bAdrenalineActive", 1))
+				{
+					SetEntProp(client, Prop_Send, "m_bAdrenalineActive", 1, 1);
+				}
+				
+				Event eAdrenalineUsed = CreateEvent("adrenaline_used", true);
+				eAdrenalineUsed.SetInt("userid", GetClientUserId(client));
+				eAdrenalineUsed.Fire();
+				
+				SDKCall(hOnAdrenalineRush, client, fAdrenalineDuration);
+			}
+			else if(pills)	PrintToChatAll("\x04%N\x03 helped himself with pills!", client); 	
 			//EmitSoundToClient(client, "player/items/pain_pills/pills_use_1.wav"); // add some sound
-
 		}
 		else if(slot==3)
 		{
@@ -916,14 +1025,10 @@ stock SetupProgressBar(client, Float:time)
 {
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", time);
-	if (!IsFakeClient(client))
-		SetEntPropString(client, Prop_Send, "m_progressBarText", "HELPING YOURSELF...");
 }
 
 stock KillProgressBar(client)
 {
-	if (!IsFakeClient(client))
-	  	SetEntPropString(client, Prop_Send, "m_progressBarText", "");
 	
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", 0.0);

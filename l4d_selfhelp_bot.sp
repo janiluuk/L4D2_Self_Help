@@ -91,7 +91,7 @@ public OnPluginStart()
 	l4d_selfhelp_eachother = CreateConVar("l4d_selfhelp_eachother", "1", "incap help each other , 0: disable, 1 :enable  ");
 	l4d_selfhelp_pickup = CreateConVar("l4d_selfhelp_pickup", "1", "incap pick up , 0: disable, 1 :enable  ");
 	l4d_selfhelp_kill = CreateConVar("l4d_selfhelp_kill", "1", "kill attacker");
-	l4d_selfhelp_announce = CreateConVar("l4d_selfhelp_announce_revive", "0", "Announce when others help themselves");
+	l4d_selfhelp_announce = CreateConVar("l4d_selfhelp_announce_revive", "1", "Announce when others help themselves");
 	l4d_selfhelp_adrenaline_rush =  CreateConVar("l4d_selfhelp_adrenaline_rush", "1", "Announce when others help themselves");
 	l4d_selfhelp_hintdelay = CreateConVar("l4d_selfhelp_hintdelay", "4.0", "hint delay");
 	l4d_selfhelp_delay = CreateConVar("l4d_selfhelp_delay", "1.0", "self help delay");
@@ -104,16 +104,13 @@ public OnPluginStart()
 	GameCheck();
 
 	HookEvent("player_incapacitated", Event_Incap);
-
 	HookEvent("lunge_pounce", lunge_pounce);
 	HookEvent("pounce_stopped", pounce_stopped);
 	HookEvent("player_ledge_grab", resetBot);
 	HookEvent("player_incapacitated", resetBot);
 	HookEvent("tongue_grab", tongue_grab);
 	HookEvent("tongue_release", tongue_release);
-
 	HookEvent("player_ledge_grab", player_ledge_grab);
-
 	HookEvent("round_start", RoundStart);
 
 	if(L4D2Version)
@@ -127,7 +124,9 @@ public OnPluginStart()
 	}
 	cvarAdrenalineDuration = FindConVar("adrenaline_duration");
 	fAdrenalineDuration = cvarAdrenalineDuration.FloatValue;
-	
+	bNotifySelfhelpEvents = (GetConVarInt(l4d_selfhelp_announce) > 0) ? true: false;
+	reviveDuration = GetConVarFloat(l4d_selfhelp_duration);
+
 }
 
 new GameMode;

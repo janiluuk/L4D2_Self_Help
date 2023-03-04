@@ -51,7 +51,7 @@ new Handle:hOnStagger = null ;
 new Handle:hOnGameData = null;
 new ConVar:cvarAdrenalineDuration;
 float fAdrenalineDuration;
-new Handle:hConf = null;
+bool bNotifySelfhelpEvents = false;
 
 new L4D2Version=false;
 public Plugin:myinfo = 
@@ -64,6 +64,22 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
+	hOnGameData = LoadGameConfigFile("l4d_selfhelp_bot");
+	if (hOnGameData == null)
+	{
+		SetFailState("[SH] Game Data Missing!");
+	}
+	
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(hOnGameData, SDKConf_Signature, "OnAdrenalineUsed");
+	PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);
+	hOnAdrenalineRush = EndPrepSDKCall();
+	if (hOnAdrenalineRush == null)
+	{
+		SetFailState("[SH] Signature 'OnAdrenalineUsed' Broken!");
+	}
+	
+	delete hOnGameData;
 	CreateConVar("l4d_selfhelp_version", PLUGIN_VERSION, " ", FCVAR_DONTRECORD);
 	
 	l4d_selfhelp_incap = CreateConVar("l4d_selfhelp_incap", "3", "self help for incap , 0:disable, 1:pill, 2:medkit, 3:both  ");
@@ -112,40 +128,6 @@ public OnPluginStart()
 	cvarAdrenalineDuration = FindConVar("adrenaline_duration");
 	fAdrenalineDuration = cvarAdrenalineDuration.FloatValue;
 	
-	char filePath[PLATFORM_MAX_PATH];
-	BuildPath(Path_SM, filePath, sizeof(filePath), "gamedata/%s.txt", GAMEDATA);
-	if( FileExists(filePath))
-	{
-		hConf = LoadGameConfigFile(GAMEDATA); // For some reason this doesn't return null even for invalid files, so check they exist first.
-	} else {
-		PrintToServer("[SM] %s unable to get %s.txt gamedata file. Generating...", PLUGIN_NAME, GAMEDATA);
-
-		hConf = LoadGameConfigFile(GAMEDATA);
-		if (hConf == null)
-		{ 
-			SetFailState("[SH] Failed to load auto-generated gamedata file!"); 
-		}
-	}	
-
-	StartPrepSDKCall(SDKCall_Player);
-	PrepSDKCall_SetFromConf(hOnGameData, SDKConf_Signature, "OnStaggered");
-	PrepSDKCall_AddParameter(SDKType_CBaseEntity, SDKPass_Pointer);
-	PrepSDKCall_AddParameter(SDKType_Vector, SDKPass_Pointer);
-	hOnStagger = EndPrepSDKCall();
-	if (hOnStagger == null)
-	{
-		SetFailState("[SH] Signature 'OnStaggered' Broken!");
-	}
-
-	StartPrepSDKCall(SDKCall_Player);
-	PrepSDKCall_SetFromConf(hOnGameData, SDKConf_Signature, "OnAdrenalineUsed");
-	PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);
-	hOnAdrenalineRush = EndPrepSDKCall();
-	if (hOnAdrenalineRush == null)
-	{
-		SetFailState("[SH] Signature 'OnAdrenalineUsed' Broken!");
-	}
-
 }
 
 new GameMode;
@@ -322,6 +304,7 @@ public Event_Incap (Handle:event, const String:name[], bool:dontBroadcast)
 		CreateTimer(GetConVarFloat(l4d_selfhelp_hintdelay), AdvertisePills, victim); 
 	}
 }
+
 public Action:player_ledge_grab(Handle:event, String:event_name[], bool:dontBroadcast)
 {
 	if(GameMode==2 && GetConVarInt(l4d_selfhelp_versus)==0)return;
@@ -333,7 +316,6 @@ public Action:player_ledge_grab(Handle:event, String:event_name[], bool:dontBroa
 		CreateTimer(GetConVarFloat(l4d_selfhelp_hintdelay), AdvertisePills, victim); 
 	}
 }
-
 
 public Action:WatchPlayer(Handle:timer, any:client)
 {
@@ -358,7 +340,7 @@ public Action:AdvertisePills(Handle:timer, any:client)
 
 	if(CanSelfHelp(client))
 	{
-		if(GetConVarInt(l4d_selfhelp_announce) > 0) 
+		if(bNotifySelfhelpEvents == true) 
 			PrintToChat(client, "Press \x04CROUCH\x03 to help yourself!");
 	}
 
@@ -778,7 +760,7 @@ SelfHelp(client)
 			HelpState[client]=STATE_OK;
 			
 			if(adrenaline) { 
-				if(GetConVarInt(l4d_selfhelp_announce) > 0) 
+				if(bNotifySelfhelpEvents == true) 
 					PrintToChatAll("\x04%N\x03 helped himself with adrenaline!", client); 
 				if(GetConVarInt(l4d_selfhelp_adrenaline_rush) > 0) { 
 					if (!GetEntProp(client, Prop_Send, "m_bAdrenalineActive", 1))
@@ -795,7 +777,7 @@ SelfHelp(client)
 			}
 			else if(pills)	{
 				
-				if(GetConVarInt(l4d_selfhelp_announce) > 0) 
+				if(bNotifySelfhelpEvents == true) 
 					PrintToChatAll("\x04%N\x03 helped himself with pills!", client); 	
 			}
 			//EmitSoundToClient(client, "player/items/pain_pills/pills_use_1.wav"); // add some sound
@@ -808,7 +790,7 @@ SelfHelp(client)
 			ReviveClientWithKid(client);
 			
 			HelpState[client]=STATE_OK;
-			if(GetConVarInt(l4d_selfhelp_announce) > 0) 
+			if(bNotifySelfhelpEvents == true) 
 				PrintToChatAll("\x04%N\x03 helped himself with medkit!", client); 
 
 			//EmitSoundToClient(client, "player/items/pain_pills/pills_use_1.wav"); // add some sound
@@ -1048,7 +1030,7 @@ public void resetBot(Event event, char []hEvent, bool dontBroadcast){
 
 		if(IsFakeClient(client))
 		{
-			if(GetConVarInt(l4d_selfhelp_announce) > 0) 
+			if(bNotifySelfhelpEvents == true) 
 				PrintToChatAll("%N Will revive in %i seconds",client, botdelay );
 			
 			CreateTimer(fBotdelay, AutoHelpBot,client,TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);	

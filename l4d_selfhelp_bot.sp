@@ -42,6 +42,8 @@ new Handle:l4d_selfhelp_eachother = INVALID_HANDLE;
 new Handle:l4d_selfhelp_pickup = INVALID_HANDLE;
 new Handle:l4d_selfhelp_bot_delay = INVALID_HANDLE;
 new Handle:l4d_selfhelp_duration = INVALID_HANDLE;
+new Handle:l4d_selfhelp_announce = INVALID_HANDLE;
+new Handle:l4d_selfhelp_adrenaline_rush = INVALID_HANDLE;
 new Handle:l4d_selfhelp_kill = INVALID_HANDLE;
 new Handle:l4d_selfhelp_versus = INVALID_HANDLE;
 new Handle:hOnAdrenalineRush = null;
@@ -73,6 +75,8 @@ public OnPluginStart()
 	l4d_selfhelp_eachother = CreateConVar("l4d_selfhelp_eachother", "1", "incap help each other , 0: disable, 1 :enable  ");
 	l4d_selfhelp_pickup = CreateConVar("l4d_selfhelp_pickup", "1", "incap pick up , 0: disable, 1 :enable  ");
 	l4d_selfhelp_kill = CreateConVar("l4d_selfhelp_kill", "1", "kill attacker");
+	l4d_selfhelp_announce = CreateConVar("l4d_selfhelp_announce_revive", "0", "Announce when others help themselves");
+	l4d_selfhelp_adrenaline_rush =  CreateConVar("l4d_selfhelp_adrenaline_rush", "1", "Announce when others help themselves");
 	l4d_selfhelp_hintdelay = CreateConVar("l4d_selfhelp_hintdelay", "4.0", "hint delay");
 	l4d_selfhelp_delay = CreateConVar("l4d_selfhelp_delay", "1.0", "self help delay");
 	l4d_selfhelp_bot_delay = CreateConVar("l4d_selfhelp_bot_delay", "10.0", "delay this amount of seconds before bots self-recover");
@@ -80,7 +84,7 @@ public OnPluginStart()
 
 	l4d_selfhelp_versus = CreateConVar("l4d_selfhelp_versus", "1", "0: disable in versus, 1: enable in versus");	
 	
-	AutoExecConfig(true, "l4d_selfhelp_en");
+	AutoExecConfig(true, "l4d_selfhelp_bot");
 	GameCheck();
 
 	HookEvent("player_incapacitated", Event_Incap);
@@ -115,63 +119,7 @@ public OnPluginStart()
 		hConf = LoadGameConfigFile(GAMEDATA); // For some reason this doesn't return null even for invalid files, so check they exist first.
 	} else {
 		PrintToServer("[SM] %s unable to get %s.txt gamedata file. Generating...", PLUGIN_NAME, GAMEDATA);
-		
-		Handle fileHandle = OpenFile(filePath, "w"); 
-		if (fileHandle == null)
-		{ 
-			SetFailState("[SM] Couldn't generate gamedata file!"); 
-		}
-		WriteFileLine(fileHandle, "\"Games\"");
-		WriteFileLine(fileHandle, "{");
-		WriteFileLine(fileHandle, "	\"left4dead2\"");
-		WriteFileLine(fileHandle, "	{");
-		WriteFileLine(fileHandle, "		\"Signatures\"");
-		WriteFileLine(fileHandle, "		{");
-		WriteFileLine(fileHandle, "			// Below 3 signatures were taken from https://forums.alliedmods.net/showthread.php?t=109715");
-		WriteFileLine(fileHandle, "			// Except OnPummelEnded's windows signature. I had to get a fresh new one.");
-		WriteFileLine(fileHandle, "		\"OnAdrenalineUsed\"");
-		WriteFileLine(fileHandle, "		{");
-		WriteFileLine(fileHandle, "		\"library\"	\"server\"");
-		WriteFileLine(fileHandle, "		\"linux\"		\"@_ZN13CTerrorPlayer16OnAdrenalineUsedEf\"");
-		WriteFileLine(fileHandle, "		\"windows\"	\"\x55\x8B\x2A\x51\x53\x56\x8B\x2A\x8D\x2A\x2A\x2A\x2A\x2A\x57\x8B\x2A\xE8\"");
-		WriteFileLine(fileHandle, "		/* 55 8B ? 51 53 56 8B ? 8D ? ? ? ? ? 57 8B ? E8 */");
-		WriteFileLine(fileHandle, "		/* Search: \"%s used adrenaline\n\" call is 3rd above, match to Linux. */");
-		WriteFileLine(fileHandle, "		}");
-		WriteFileLine(fileHandle, "		\"SetHealthBuffer\"");
-		WriteFileLine(fileHandle, "		{");
-		WriteFileLine(fileHandle, "		\"library\" \"server\"");
-		WriteFileLine(fileHandle, "		\"linux\" \"@_ZN13CTerrorPlayer15SetHealthBufferEf\"");
-		WriteFileLine(fileHandle, "		\"windows\" \"\x55\x8B\xEC\xF3\x0F\x10\x45\x08\x0F\x57\xC9\x0F\x2F\xC1\x56\"");
-		WriteFileLine(fileHandle, "		/* 55 8B EC F3 0F 10 45 08 0F 57 C9 0F 2F C1 56 */");
-		WriteFileLine(fileHandle, "		}");
-		WriteFileLine(fileHandle, "		\"OnAdrenalineUsed\"");
-		WriteFileLine(fileHandle, "		{");
-		WriteFileLine(fileHandle, "		\"library\"	\"server\"");
-		WriteFileLine(fileHandle, "		\"linux\"		\"@_ZN13CTerrorPlayer16OnAdrenalineUsedEf\"");
-		WriteFileLine(fileHandle, "		\"windows\"	\"\x55\x8B\x2A\x51\x53\x56\x8B\x2A\x8D\x2A\x2A\x2A\x2A\x2A\x57\x8B\x2A\xE8\"");
-		WriteFileLine(fileHandle, "		/* 55 8B ? 51 53 56 8B ? 8D ? ? ? ? ? 57 8B ? E8 */");
-		WriteFileLine(fileHandle, "		/* Search: \"%s used adrenaline\n\" call is 3rd above, match to Linux. */");
-		WriteFileLine(fileHandle, "		}");
-		WriteFileLine(fileHandle, "		\"OnRevived\"");
-		WriteFileLine(fileHandle, "		{");
-		WriteFileLine(fileHandle, "		\"library\"	\"server\"");
-		WriteFileLine(fileHandle, "		\"linux\"		\"@_ZN13CTerrorPlayer9OnRevivedEv\"");
-		WriteFileLine(fileHandle, "		\"windows\"	\"\x2A\x2A\x2A\x2A\x2A\x2A\x53\x56\x8B\xF1\x8B\x06\x8B\x90\x2A\x2A\x2A\x2A\x57\xFF\xD2\x84\xC0\x0F\x84\x2A\x2A\x2A\x2A\x8B\xCE\"");
-		WriteFileLine(fileHandle, "		/* ? ? ? ? ? ? 53 56 8B F1 8B 06 8B 90 ? ? ? ? 57 FF D2 84 C0 0F 84 ? ? ? ? 8B CE */");
-		WriteFileLine(fileHandle, "		}");
-		WriteFileLine(fileHandle, "		\"OnStaggered\"");
-		WriteFileLine(fileHandle, "		{");
-		WriteFileLine(fileHandle, "		\"library\"	\"server\"");
-		WriteFileLine(fileHandle, "		\"linux\"		\"@_ZN13CTerrorPlayer11OnStaggeredEP11CBaseEntityPK6Vector\"");
-		WriteFileLine(fileHandle, "		\"windows\" 	\"\x2A\x2A\x2A\x2A\x2A\x2A\x83\x2A\x2A\x83\x2A\x2A\x55\x8B\x2A\x2A\x89\x2A\x2A\x2A\x8B\x2A\x83\x2A\x2A\x56\x57\x8B\x2A\xE8\x2A\x2A\x2A\x2A\x84\x2A\x0F\x85\x2A\x2A\x2A\x2A\x8B\x2A\x8B\"");
-		WriteFileLine(fileHandle, "		/* ? ? ? ? ? ? 83 ? ? 83 ? ? 55 8B ? ? 89 ? ? ? 8B ? 83 ? ? 56 57 8B ? E8 ? ? ? ? 84 ? 0F 85 ? ? ? ? 8B ? 8B");
-		WriteFileLine(fileHandle, "		 * Using a long local jump as the unique portion (last few bytes of sig)");
-		WriteFileLine(fileHandle, "		 */");
-		WriteFileLine(fileHandle, "		}");
-		WriteFileLine(fileHandle, "	}");
-		WriteFileLine(fileHandle, "}");
-		
-		CloseHandle(fileHandle);
+
 		hConf = LoadGameConfigFile(GAMEDATA);
 		if (hConf == null)
 		{ 
@@ -199,6 +147,7 @@ public OnPluginStart()
 	}
 
 }
+
 new GameMode;
 GameCheck()
 {
@@ -228,6 +177,7 @@ GameCheck()
 		L4D2Version=false;
 	}
 }
+
 public OnMapStart()
 {
 	if(L4D2Version)	PrecacheSound(SOUND_KILL2, true) ;
@@ -239,6 +189,7 @@ public Action:RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 	reset();
 	return Plugin_Continue;
 }
+
 public lunge_pounce (Handle:event, const String:name[], bool:dontBroadcast)
 {
 	if(GameMode==2 && GetConVarInt(l4d_selfhelp_versus)==0)return;
@@ -255,6 +206,7 @@ public lunge_pounce (Handle:event, const String:name[], bool:dontBroadcast)
 	}
 	//PrintToChatAll("start prounce"); 
 }
+
 public pounce_stopped (Handle:event, const String:name[], bool:dontBroadcast)
 {
 	if(GameMode==2 && GetConVarInt(l4d_selfhelp_versus)==0)return;	
@@ -263,6 +215,7 @@ public pounce_stopped (Handle:event, const String:name[], bool:dontBroadcast)
 	Attacker[victim] = 0;
 	//PrintToChatAll("end prounce"); 
 }
+
 public tongue_grab (Handle:event, const String:name[], bool:dontBroadcast)
 {
 	if(GameMode==2 && GetConVarInt(l4d_selfhelp_versus)==0)return;
@@ -293,6 +246,7 @@ public tongue_release (Handle:event, const String:name[], bool:dontBroadcast)
 	//PrintToChatAll("end grab"); 
 
 }
+
 public jockey_ride (Handle:event, const String:name[], bool:dontBroadcast)
 {
 	if(GameMode==2 && GetConVarInt(l4d_selfhelp_versus)==0)return;
@@ -404,7 +358,8 @@ public Action:AdvertisePills(Handle:timer, any:client)
 
 	if(CanSelfHelp(client))
 	{
-		PrintToChat(client, "Press \x04CROUCH\x03 to help yourself!");
+		if(GetConVarInt(l4d_selfhelp_announce) > 0) 
+			PrintToChat(client, "Press \x04CROUCH\x03 to help yourself!");
 	}
 
 }
@@ -823,19 +778,26 @@ SelfHelp(client)
 			HelpState[client]=STATE_OK;
 			
 			if(adrenaline) { 
-				PrintToChatAll("\x04%N\x03 helped himself with adrenaline!", client); 
-				if (!GetEntProp(client, Prop_Send, "m_bAdrenalineActive", 1))
-				{
-					SetEntProp(client, Prop_Send, "m_bAdrenalineActive", 1, 1);
+				if(GetConVarInt(l4d_selfhelp_announce) > 0) 
+					PrintToChatAll("\x04%N\x03 helped himself with adrenaline!", client); 
+				if(GetConVarInt(l4d_selfhelp_adrenaline_rush) > 0) { 
+					if (!GetEntProp(client, Prop_Send, "m_bAdrenalineActive", 1))
+					{
+						SetEntProp(client, Prop_Send, "m_bAdrenalineActive", 1, 1);
+					}
+					
+					Event eAdrenalineUsed = CreateEvent("adrenaline_used", true);
+					eAdrenalineUsed.SetInt("userid", GetClientUserId(client));
+					eAdrenalineUsed.Fire();
+					
+					SDKCall(hOnAdrenalineRush, client, fAdrenalineDuration);
 				}
-				
-				Event eAdrenalineUsed = CreateEvent("adrenaline_used", true);
-				eAdrenalineUsed.SetInt("userid", GetClientUserId(client));
-				eAdrenalineUsed.Fire();
-				
-				SDKCall(hOnAdrenalineRush, client, fAdrenalineDuration);
 			}
-			else if(pills)	PrintToChatAll("\x04%N\x03 helped himself with pills!", client); 	
+			else if(pills)	{
+				
+				if(GetConVarInt(l4d_selfhelp_announce) > 0) 
+					PrintToChatAll("\x04%N\x03 helped himself with pills!", client); 	
+			}
 			//EmitSoundToClient(client, "player/items/pain_pills/pills_use_1.wav"); // add some sound
 		}
 		else if(slot==3)
@@ -846,7 +808,8 @@ SelfHelp(client)
 			ReviveClientWithKid(client);
 			
 			HelpState[client]=STATE_OK;
-			PrintToChatAll("\x04%N\x03 helped himself with medkit!", client); 
+			if(GetConVarInt(l4d_selfhelp_announce) > 0) 
+				PrintToChatAll("\x04%N\x03 helped himself with medkit!", client); 
 
 			//EmitSoundToClient(client, "player/items/pain_pills/pills_use_1.wav"); // add some sound
 		}
@@ -1085,53 +1048,55 @@ public void resetBot(Event event, char []hEvent, bool dontBroadcast){
 
 		if(IsFakeClient(client))
 		{
-			PrintToChatAll("%N Will revive in %i seconds",client, botdelay );
+			if(GetConVarInt(l4d_selfhelp_announce) > 0) 
+				PrintToChatAll("%N Will revive in %i seconds",client, botdelay );
+			
 			CreateTimer(fBotdelay, AutoHelpBot,client,TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);	
-			} else {
-				//PrintToChat(client,"Hold CROUCH to help yourself up!");
-			}
-		}		
-	}
-
-	public Action AutoHelpBot(Handle hTimer, int client)
-	{
-		if(((client < 0) || (client > MaxClients)) || !IsClientInGame(client))
-		return Plugin_Stop;
-		if(!IsPlayerAlive(client) || (GetClientTeam(client) != 2))
-		return Plugin_Stop;
-
-		if(ManageClientInventory(client,true) && IsFakeClient(client) && !capped(client))
-		{
-			CheatCommand(client, "give", "health", "");
-			SetEntDataFloat(client, FindSendPropInfo("CTerrorPlayer","m_healthBuffer"), 60.0, true);
-			SetEntityHealth(client, 1);
-			return Plugin_Stop;
+		} else {
+			//PrintToChat(client,"Hold CROUCH to help yourself up!");
 		}
-		return Plugin_Continue;
-	}
+	}		
+}
 
-	stock bool IsIncapacitated(const int client){
-		return view_as<bool>(GetEntProp(client, Prop_Send, "m_isIncapacitated"));
-	}
+public Action AutoHelpBot(Handle hTimer, int client)
+{
+	if(((client < 0) || (client > MaxClients)) || !IsClientInGame(client))
+	return Plugin_Stop;
+	if(!IsPlayerAlive(client) || (GetClientTeam(client) != 2))
+	return Plugin_Stop;
 
-	stock bool IsHanging(const int client){
-		return view_as<bool>(GetEntProp(client, Prop_Send, "m_isHangingFromLedge"));
-	}
-
-	stock void CheatCommand(const int client, char []command, char []parameter1, char []parameter2)
+	if(ManageClientInventory(client,true) && IsFakeClient(client) && !capped(client))
 	{
-		int userflags = GetUserFlagBits(client);
-		SetUserFlagBits(client, ADMFLAG_ROOT);
-		int flags = GetCommandFlags(command);
-		SetCommandFlags(command, flags & ~FCVAR_CHEAT);
-		FakeClientCommand(client, "%s %s %s", command, parameter1, parameter2);
-		SetCommandFlags(command, flags);
-		SetUserFlagBits(client, userflags);
+		CheatCommand(client, "give", "health", "");
+		SetEntDataFloat(client, FindSendPropInfo("CTerrorPlayer","m_healthBuffer"), 60.0, true);
+		SetEntityHealth(client, 1);
+		return Plugin_Stop;
 	}
+	return Plugin_Continue;
+}
 
-	bool capped(const int client){
-		return 
-		(GetEntPropEnt(client, Prop_Send, "m_tongueOwner"   ) > 0) ? true : 
-		(GetEntPropEnt(client, Prop_Send, "m_carryAttacker" ) > 0) ? true : 
-		(GetEntPropEnt(client, Prop_Send, "m_pounceAttacker") > 0) ? true : false;          
-	}
+stock bool IsIncapacitated(const int client){
+	return view_as<bool>(GetEntProp(client, Prop_Send, "m_isIncapacitated"));
+}
+
+stock bool IsHanging(const int client){
+	return view_as<bool>(GetEntProp(client, Prop_Send, "m_isHangingFromLedge"));
+}
+
+stock void CheatCommand(const int client, char []command, char []parameter1, char []parameter2)
+{
+	int userflags = GetUserFlagBits(client);
+	SetUserFlagBits(client, ADMFLAG_ROOT);
+	int flags = GetCommandFlags(command);
+	SetCommandFlags(command, flags & ~FCVAR_CHEAT);
+	FakeClientCommand(client, "%s %s %s", command, parameter1, parameter2);
+	SetCommandFlags(command, flags);
+	SetUserFlagBits(client, userflags);
+}
+
+bool capped(const int client){
+	return 
+	(GetEntPropEnt(client, Prop_Send, "m_tongueOwner"   ) > 0) ? true : 
+	(GetEntPropEnt(client, Prop_Send, "m_carryAttacker" ) > 0) ? true : 
+	(GetEntPropEnt(client, Prop_Send, "m_pounceAttacker") > 0) ? true : false;          
+}

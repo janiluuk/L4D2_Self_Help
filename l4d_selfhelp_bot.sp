@@ -2,11 +2,12 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 
 #define SOUND_KILL1  "/weapons/knife/knife_hitwall1.wav"
 #define SOUND_KILL2  "/weapons/knife/knife_deploy.wav"
-
+#define GAMEDATA "l4d_selfhelp_bot"
+#define PLUGIN_NAME "Self Help with bot support"
 #define INCAP	         1
 #define INCAP_GRAB	     2
 #define INCAP_POUNCE     3
@@ -41,14 +42,21 @@ new Handle:l4d_selfhelp_eachother = INVALID_HANDLE;
 new Handle:l4d_selfhelp_pickup = INVALID_HANDLE;
 new Handle:l4d_selfhelp_bot_delay = INVALID_HANDLE;
 new Handle:l4d_selfhelp_duration = INVALID_HANDLE;
-
+new Handle:l4d_selfhelp_announce = INVALID_HANDLE;
+new Handle:l4d_selfhelp_adrenaline_rush = INVALID_HANDLE;
+new Handle:l4d_selfhelp_adrenaline_duration = INVALID_HANDLE;
 new Handle:l4d_selfhelp_kill = INVALID_HANDLE;
-
 new Handle:l4d_selfhelp_versus = INVALID_HANDLE;
+new Handle:hOnAdrenalineRush = null;
+new Handle:hOnGameData = null;
+new ConVar:cvarAdrenalineDuration;
+float fAdrenalineDuration;
+bool bNotifySelfhelpEvents = false;
+
 new L4D2Version=false;
 public Plugin:myinfo = 
 {
-	name = "Self Help with bot support ",
+	name = PLUGIN_NAME,
 	author = "Pan Xiaohai, Yani",
 	description = "",
 	version = PLUGIN_VERSION,	
@@ -56,6 +64,22 @@ public Plugin:myinfo =
 
 public OnPluginStart()
 {
+	hOnGameData = LoadGameConfigFile("l4d_selfhelp_bot");
+	if (hOnGameData == null)
+	{
+		SetFailState("[SH] Game Data Missing!");
+	}
+	
+	StartPrepSDKCall(SDKCall_Player);
+	PrepSDKCall_SetFromConf(hOnGameData, SDKConf_Signature, "OnAdrenalineUsed");
+	PrepSDKCall_AddParameter(SDKType_Float, SDKPass_Plain);
+	hOnAdrenalineRush = EndPrepSDKCall();
+	if (hOnAdrenalineRush == null)
+	{
+		SetFailState("[SH] Signature 'OnAdrenalineUsed' Broken!");
+	}
+	
+	delete hOnGameData;
 	CreateConVar("l4d_selfhelp_version", PLUGIN_VERSION, " ", FCVAR_DONTRECORD);
 	
 	l4d_selfhelp_incap = CreateConVar("l4d_selfhelp_incap", "3", "self help for incap , 0:disable, 1:pill, 2:medkit, 3:both  ");
@@ -67,6 +91,9 @@ public OnPluginStart()
 	l4d_selfhelp_eachother = CreateConVar("l4d_selfhelp_eachother", "1", "incap help each other , 0: disable, 1 :enable  ");
 	l4d_selfhelp_pickup = CreateConVar("l4d_selfhelp_pickup", "1", "incap pick up , 0: disable, 1 :enable  ");
 	l4d_selfhelp_kill = CreateConVar("l4d_selfhelp_kill", "1", "kill attacker");
+	l4d_selfhelp_announce = CreateConVar("l4d_selfhelp_announce_revive", "1", "Announce when others help themselves");
+	l4d_selfhelp_adrenaline_rush =  CreateConVar("l4d_selfhelp_adrenaline_rush", "1", "Enable adrenaline rush if user revived with adrenaline");
+	l4d_selfhelp_adrenaline_duration =  CreateConVar("l4d_selfhelp_adrenaline_rush", "10", "Duration of the rush. 0 for default");	
 	l4d_selfhelp_hintdelay = CreateConVar("l4d_selfhelp_hintdelay", "4.0", "hint delay");
 	l4d_selfhelp_delay = CreateConVar("l4d_selfhelp_delay", "1.0", "self help delay");
 	l4d_selfhelp_bot_delay = CreateConVar("l4d_selfhelp_bot_delay", "10.0", "delay this amount of seconds before bots self-recover");
@@ -74,20 +101,17 @@ public OnPluginStart()
 
 	l4d_selfhelp_versus = CreateConVar("l4d_selfhelp_versus", "1", "0: disable in versus, 1: enable in versus");	
 	
-	AutoExecConfig(true, "l4d_selfhelp_en");
+	AutoExecConfig(true, "l4d_selfhelp_bot");
 	GameCheck();
 
 	HookEvent("player_incapacitated", Event_Incap);
-
 	HookEvent("lunge_pounce", lunge_pounce);
 	HookEvent("pounce_stopped", pounce_stopped);
 	HookEvent("player_ledge_grab", resetBot);
 	HookEvent("player_incapacitated", resetBot);
 	HookEvent("tongue_grab", tongue_grab);
 	HookEvent("tongue_release", tongue_release);
-
 	HookEvent("player_ledge_grab", player_ledge_grab);
-
 	HookEvent("round_start", RoundStart);
 
 	if(L4D2Version)
@@ -99,8 +123,17 @@ public OnPluginStart()
 		HookEvent("charger_pummel_end", charger_pummel_end);
 
 	}
+	cvarAdrenalineDuration = FindConVar("adrenaline_duration");
+	fAdrenalineDuration = cvarAdrenalineDuration.FloatValue;
+	if (GetConVarInt(l4d_selfhelp_adrenaline_duration) > 0) {
+		fAdrenalineDuration = GetConVarFloat(l4d_selfhelp_adrenaline_duration);
+	}
+
+	bNotifySelfhelpEvents = (GetConVarInt(l4d_selfhelp_announce) > 0) ? true: false;
 	reviveDuration = GetConVarFloat(l4d_selfhelp_duration);
+
 }
+
 new GameMode;
 GameCheck()
 {
@@ -130,6 +163,7 @@ GameCheck()
 		L4D2Version=false;
 	}
 }
+
 public OnMapStart()
 {
 	if(L4D2Version)	PrecacheSound(SOUND_KILL2, true) ;
@@ -141,6 +175,7 @@ public Action:RoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 	reset();
 	return Plugin_Continue;
 }
+
 public lunge_pounce (Handle:event, const String:name[], bool:dontBroadcast)
 {
 	if(GameMode==2 && GetConVarInt(l4d_selfhelp_versus)==0)return;
@@ -157,6 +192,7 @@ public lunge_pounce (Handle:event, const String:name[], bool:dontBroadcast)
 	}
 	//PrintToChatAll("start prounce"); 
 }
+
 public pounce_stopped (Handle:event, const String:name[], bool:dontBroadcast)
 {
 	if(GameMode==2 && GetConVarInt(l4d_selfhelp_versus)==0)return;	
@@ -165,6 +201,7 @@ public pounce_stopped (Handle:event, const String:name[], bool:dontBroadcast)
 	Attacker[victim] = 0;
 	//PrintToChatAll("end prounce"); 
 }
+
 public tongue_grab (Handle:event, const String:name[], bool:dontBroadcast)
 {
 	if(GameMode==2 && GetConVarInt(l4d_selfhelp_versus)==0)return;
@@ -195,6 +232,7 @@ public tongue_release (Handle:event, const String:name[], bool:dontBroadcast)
 	//PrintToChatAll("end grab"); 
 
 }
+
 public jockey_ride (Handle:event, const String:name[], bool:dontBroadcast)
 {
 	if(GameMode==2 && GetConVarInt(l4d_selfhelp_versus)==0)return;
@@ -270,6 +308,7 @@ public Event_Incap (Handle:event, const String:name[], bool:dontBroadcast)
 		CreateTimer(GetConVarFloat(l4d_selfhelp_hintdelay), AdvertisePills, victim); 
 	}
 }
+
 public Action:player_ledge_grab(Handle:event, String:event_name[], bool:dontBroadcast)
 {
 	if(GameMode==2 && GetConVarInt(l4d_selfhelp_versus)==0)return;
@@ -281,7 +320,6 @@ public Action:player_ledge_grab(Handle:event, String:event_name[], bool:dontBroa
 		CreateTimer(GetConVarFloat(l4d_selfhelp_hintdelay), AdvertisePills, victim); 
 	}
 }
-
 
 public Action:WatchPlayer(Handle:timer, any:client)
 {
@@ -306,7 +344,8 @@ public Action:AdvertisePills(Handle:timer, any:client)
 
 	if(CanSelfHelp(client))
 	{
-		PrintToChat(client, "Press \x04CROUCH\x03 to help yourself!");
+		if(bNotifySelfhelpEvents == true) 
+			PrintToChat(client, "Press \x04CROUCH\x03 to help yourself!");
 	}
 
 }
@@ -724,10 +763,28 @@ SelfHelp(client)
 
 			HelpState[client]=STATE_OK;
 			
-			if(adrenaline)	PrintToChatAll("\x04%N\x03 helped himself with adrenaline!", client);  
-			if(pills)	PrintToChatAll("\x04%N\x03 helped himself with pills!", client); 	
+			if(adrenaline) { 
+				if(bNotifySelfhelpEvents == true) 
+					PrintToChatAll("\x04%N\x03 helped himself with adrenaline!", client); 
+				if(GetConVarInt(l4d_selfhelp_adrenaline_rush) > 0) { 
+					if (!GetEntProp(client, Prop_Send, "m_bAdrenalineActive", 1))
+					{
+						SetEntProp(client, Prop_Send, "m_bAdrenalineActive", 1, 1);
+					}
+					
+					Event eAdrenalineUsed = CreateEvent("adrenaline_used", true);
+					eAdrenalineUsed.SetInt("userid", GetClientUserId(client));
+					eAdrenalineUsed.Fire();
+					
+					SDKCall(hOnAdrenalineRush, client, fAdrenalineDuration);
+				}
+			}
+			else if(pills)	{
+				
+				if(bNotifySelfhelpEvents == true) 
+					PrintToChatAll("\x04%N\x03 helped himself with pills!", client); 	
+			}
 			//EmitSoundToClient(client, "player/items/pain_pills/pills_use_1.wav"); // add some sound
-
 		}
 		else if(slot==3)
 		{
@@ -737,7 +794,8 @@ SelfHelp(client)
 			ReviveClientWithKid(client);
 			
 			HelpState[client]=STATE_OK;
-			PrintToChatAll("\x04%N\x03 helped himself with medkit!", client); 
+			if(bNotifySelfhelpEvents == true) 
+				PrintToChatAll("\x04%N\x03 helped himself with medkit!", client); 
 
 			//EmitSoundToClient(client, "player/items/pain_pills/pills_use_1.wav"); // add some sound
 		}
@@ -916,12 +974,11 @@ stock SetupProgressBar(client, Float:time)
 {
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", time);
-	SetEntPropString(client, Prop_Send, "m_progressBarText", "HELPING YOURSELF...");
 }
 
 stock KillProgressBar(client)
 {
-  	SetEntPropString(client, Prop_Send, "m_progressBarText", "");
+	
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarStartTime", GetGameTime());
 	SetEntPropFloat(client, Prop_Send, "m_flProgressBarDuration", 0.0);
 }
@@ -977,53 +1034,55 @@ public void resetBot(Event event, char []hEvent, bool dontBroadcast){
 
 		if(IsFakeClient(client))
 		{
-			PrintToChatAll("%N Will revive in %i seconds",client, botdelay );
+			if(bNotifySelfhelpEvents == true) 
+				PrintToChatAll("%N Will revive in %i seconds",client, botdelay );
+			
 			CreateTimer(fBotdelay, AutoHelpBot,client,TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);	
-			} else {
-				//PrintToChat(client,"Hold CROUCH to help yourself up!");
-			}
-		}		
-	}
-
-	public Action AutoHelpBot(Handle hTimer, int client)
-	{
-		if(((client < 0) || (client > MaxClients)) || !IsClientInGame(client))
-		return Plugin_Stop;
-		if(!IsPlayerAlive(client) || (GetClientTeam(client) != 2))
-		return Plugin_Stop;
-
-		if(ManageClientInventory(client,true) && IsFakeClient(client) && !capped(client))
-		{
-			CheatCommand(client, "give", "health", "");
-			SetEntDataFloat(client, FindSendPropInfo("CTerrorPlayer","m_healthBuffer"), 60.0, true);
-			SetEntityHealth(client, 1);
-			return Plugin_Stop;
+		} else {
+			//PrintToChat(client,"Hold CROUCH to help yourself up!");
 		}
-		return Plugin_Continue;
-	}
+	}		
+}
 
-	stock bool IsIncapacitated(const int client){
-		return view_as<bool>(GetEntProp(client, Prop_Send, "m_isIncapacitated"));
-	}
+public Action AutoHelpBot(Handle hTimer, int client)
+{
+	if(((client < 0) || (client > MaxClients)) || !IsClientInGame(client))
+	return Plugin_Stop;
+	if(!IsPlayerAlive(client) || (GetClientTeam(client) != 2))
+	return Plugin_Stop;
 
-	stock bool IsHanging(const int client){
-		return view_as<bool>(GetEntProp(client, Prop_Send, "m_isHangingFromLedge"));
-	}
-
-	stock void CheatCommand(const int client, char []command, char []parameter1, char []parameter2)
+	if(ManageClientInventory(client,true) && IsFakeClient(client) && !capped(client))
 	{
-		int userflags = GetUserFlagBits(client);
-		SetUserFlagBits(client, ADMFLAG_ROOT);
-		int flags = GetCommandFlags(command);
-		SetCommandFlags(command, flags & ~FCVAR_CHEAT);
-		FakeClientCommand(client, "%s %s %s", command, parameter1, parameter2);
-		SetCommandFlags(command, flags);
-		SetUserFlagBits(client, userflags);
+		CheatCommand(client, "give", "health", "");
+		SetEntDataFloat(client, FindSendPropInfo("CTerrorPlayer","m_healthBuffer"), 60.0, true);
+		SetEntityHealth(client, 1);
+		return Plugin_Stop;
 	}
+	return Plugin_Continue;
+}
 
-	bool capped(const int client){
-		return 
-		(GetEntPropEnt(client, Prop_Send, "m_tongueOwner"   ) > 0) ? true : 
-		(GetEntPropEnt(client, Prop_Send, "m_carryAttacker" ) > 0) ? true : 
-		(GetEntPropEnt(client, Prop_Send, "m_pounceAttacker") > 0) ? true : false;          
-	}
+stock bool IsIncapacitated(const int client){
+	return view_as<bool>(GetEntProp(client, Prop_Send, "m_isIncapacitated"));
+}
+
+stock bool IsHanging(const int client){
+	return view_as<bool>(GetEntProp(client, Prop_Send, "m_isHangingFromLedge"));
+}
+
+stock void CheatCommand(const int client, char []command, char []parameter1, char []parameter2)
+{
+	int userflags = GetUserFlagBits(client);
+	SetUserFlagBits(client, ADMFLAG_ROOT);
+	int flags = GetCommandFlags(command);
+	SetCommandFlags(command, flags & ~FCVAR_CHEAT);
+	FakeClientCommand(client, "%s %s %s", command, parameter1, parameter2);
+	SetCommandFlags(command, flags);
+	SetUserFlagBits(client, userflags);
+}
+
+bool capped(const int client){
+	return 
+	(GetEntPropEnt(client, Prop_Send, "m_tongueOwner"   ) > 0) ? true : 
+	(GetEntPropEnt(client, Prop_Send, "m_carryAttacker" ) > 0) ? true : 
+	(GetEntPropEnt(client, Prop_Send, "m_pounceAttacker") > 0) ? true : false;          
+}

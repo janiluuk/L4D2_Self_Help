@@ -44,10 +44,10 @@ new Handle:l4d_selfhelp_bot_delay = INVALID_HANDLE;
 new Handle:l4d_selfhelp_duration = INVALID_HANDLE;
 new Handle:l4d_selfhelp_announce = INVALID_HANDLE;
 new Handle:l4d_selfhelp_adrenaline_rush = INVALID_HANDLE;
+new Handle:l4d_selfhelp_adrenaline_duration = INVALID_HANDLE;
 new Handle:l4d_selfhelp_kill = INVALID_HANDLE;
 new Handle:l4d_selfhelp_versus = INVALID_HANDLE;
 new Handle:hOnAdrenalineRush = null;
-new Handle:hOnStagger = null ;
 new Handle:hOnGameData = null;
 new ConVar:cvarAdrenalineDuration;
 float fAdrenalineDuration;
@@ -92,7 +92,8 @@ public OnPluginStart()
 	l4d_selfhelp_pickup = CreateConVar("l4d_selfhelp_pickup", "1", "incap pick up , 0: disable, 1 :enable  ");
 	l4d_selfhelp_kill = CreateConVar("l4d_selfhelp_kill", "1", "kill attacker");
 	l4d_selfhelp_announce = CreateConVar("l4d_selfhelp_announce_revive", "1", "Announce when others help themselves");
-	l4d_selfhelp_adrenaline_rush =  CreateConVar("l4d_selfhelp_adrenaline_rush", "1", "Announce when others help themselves");
+	l4d_selfhelp_adrenaline_rush =  CreateConVar("l4d_selfhelp_adrenaline_rush", "1", "Enable adrenaline rush if user revived with adrenaline");
+	l4d_selfhelp_adrenaline_duration =  CreateConVar("l4d_selfhelp_adrenaline_rush", "10", "Duration of the rush. 0 for default");	
 	l4d_selfhelp_hintdelay = CreateConVar("l4d_selfhelp_hintdelay", "4.0", "hint delay");
 	l4d_selfhelp_delay = CreateConVar("l4d_selfhelp_delay", "1.0", "self help delay");
 	l4d_selfhelp_bot_delay = CreateConVar("l4d_selfhelp_bot_delay", "10.0", "delay this amount of seconds before bots self-recover");
@@ -124,6 +125,10 @@ public OnPluginStart()
 	}
 	cvarAdrenalineDuration = FindConVar("adrenaline_duration");
 	fAdrenalineDuration = cvarAdrenalineDuration.FloatValue;
+	if (GetConVarInt(l4d_selfhelp_adrenaline_duration) > 0) {
+		fAdrenalineDuration = GetConVarFloat(l4d_selfhelp_adrenaline_duration);
+	}
+
 	bNotifySelfhelpEvents = (GetConVarInt(l4d_selfhelp_announce) > 0) ? true: false;
 	reviveDuration = GetConVarFloat(l4d_selfhelp_duration);
 

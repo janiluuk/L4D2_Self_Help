@@ -1035,7 +1035,7 @@ public void resetBot(Event event, char []hEvent, bool dontBroadcast){
 		if(IsFakeClient(client))
 		{
 			if(bNotifySelfhelpEvents == true) 
-				PrintToChatAll("%N Will revive in %i seconds",client, botdelay );
+				PrintToChatAll("\x04%N\x01 Will revive in \x04 %i\x01 seconds",client, botdelay );
 			
 			CreateTimer(fBotdelay, AutoHelpBot,client,TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);	
 		} else {
